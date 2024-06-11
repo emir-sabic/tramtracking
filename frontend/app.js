@@ -1,56 +1,6 @@
-// Define StationNode and CircularLinkedList classes
-class StationNode {
-    constructor(station) {
-        this.station = station;
-        this.next = null;
-    }
-}
-
-class CircularLinkedList {
-    constructor() {
-        this.head = null;
-        this.tail = null;
-    }
-
-    addStation(station) {
-        const newNode = new StationNode(station);
-        if (!this.head) {
-            this.head = newNode;
-            this.tail = newNode;
-            newNode.next = this.head; // Point to itself
-        } else {
-            this.tail.next = newNode;
-            this.tail = newNode;
-            this.tail.next = this.head; // Point to head to make it circular
-        }
-    }
-
-    findStationById(id) {
-        let currentNode = this.head;
-        if (!currentNode) return null;
-
-        do {
-            if (currentNode.station.id === id) {
-                return currentNode;
-            }
-            currentNode = currentNode.next;
-        } while (currentNode !== this.head);
-
-        return null; // Station not found
-    }
-
-    getNextStation(currentStationId) {
-        const currentNode = this.findStationById(currentStationId);
-        if (currentNode) {
-            return currentNode.next.station;
-        }
-        return null; // Current station not found
-    }
-}
-
 // Initialize the map centered on Sarajevo
 var map = L.map('mapid').setView([43.8563, 18.4131], 13);
-var stationsList = new CircularLinkedList(); // Circular Linked List for stations
+var stations = []; // Array to store stations
 var tramMarkers = {}; // Object to store tram markers
 
 // Add OpenStreetMap tile layer to the map
@@ -60,36 +10,46 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // Define tram icons
-const tramIcon = L.icon({
+const normalIcon = L.icon({
     iconUrl: 'assets/train.png',
     iconSize: [25, 25],
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
     shadowSize: [41, 41]
 });
+const highlightedIcon = L.icon({
+    iconUrl: 'assets/tramacc.png', // Ensure you have this highlighted icon
+    iconSize: [40, 40],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
 
-// Fetch stations and add them to the Circular LinkedList and map
+// Fetch stations and add them to the map
 fetch('http://localhost:3000/api/stations')
     .then(response => response.json())
     .then(fetchedStations => {
-        fetchedStations.sort((a, b) => a.id - b.id); // Ensure stations are in order
-        fetchedStations.forEach(station => {
-            stationsList.addStation(station); // Add each station to the Circular LinkedList
-        });
-        displayStations(fetchedStations); // Display stations on the map
-        initializeTramMarkers(); // Initialize tram markers after stations are loaded
-    })
-    .catch(error => console.error('Error fetching stations:', error));
+        if (!Array.isArray(fetchedStations) || fetchedStations.length === 0) {
+            console.error('Failed to load stations or data is empty');
+            return;
+        }
+        stations = fetchedStations;
+        displayStations(stations);
+    }).catch(error => {
+        console.error('Error fetching stations:', error);
+    });
 
 function displayStations(stations) {
     stations.forEach(station => {
         var marker = L.marker([station.latitude, station.longitude], {
             icon: L.icon({
                 iconUrl: 'assets/pini.png',
-                iconSize: [25, 25]
+                iconSize: [25, 25],
+                className: `marker-${station.id}`
             })
         }).addTo(map);
-        marker.bindPopup(`Station: ${station.name}`);
+        marker.bindPopup('Station: ' + station.name);
+        tramMarkers[station.id] = marker; // Store markers by station ID for easy access
     });
 }
 
@@ -100,126 +60,95 @@ function initializeTramMarkers() {
         .then(trams => {
             Object.keys(trams).forEach(tramId => {
                 let tram = trams[tramId];
-                let marker = L.marker([tram.lat, tram.lng], {
-                    icon: tramIcon
-                }).addTo(map);
-                tramMarkers[tramId] = marker;
+                if (tram.lat && tram.lng) {
+                    let marker = L.marker([tram.lat, tram.lng], {
+                        icon: normalIcon
+                    }).addTo(map);
+                    tramMarkers[tramId] = marker;
 
-                let nearestStation = findNearestStation(tram);
-                if (nearestStation) {
-                    tram.currentStationId = nearestStation.id;
-                    console.log(`Initial current station for tram ${tramId}: ${tram.currentStationId}`);
+                    // Set the initial currentStationId based on the nearest station
+                    let nearestStation = findNearestStation(tram);
+                    if (nearestStation) {
+                        tram.currentStationId = nearestStation.id;
+                        tram.direction = 1; // Initialize direction to forward
+                        marker.currentStationId = tram.currentStationId;
+                    }
+                    updateTramMarker(tramId, tram.currentStationId); // Update tram markers on the map
                 }
-                marker.on('click', () => {
-                    generatePopupContent(tram, tramId).then(popupContent => {
-                        marker.bindPopup(popupContent).openPopup();
-                    });
-                });
-                updateTramMarker(tramId, tram);
             });
-        })
-        .catch(error => console.error('Error fetching tram positions:', error));
+        });
 }
 
-// Threshold distance to consider a tram as passing a station (in meters)
-const STATION_PROXIMITY_THRESHOLD = 50;
+initializeTramMarkers();
 
-function updateTramMarker(tramId, tram) {
+function updateTramMarker(tramId, station) {
     fetch('http://localhost:3000/api/tramPositions')
         .then(response => response.json())
         .then(trams => {
-            let tram = trams[tramId];
-            let marker = tramMarkers[tramId];
-            if (marker) {
-                let newLatLng = new L.LatLng(tram.lat, tram.lng);
-                if (!marker.getLatLng().equals(newLatLng)) {
-                    marker.setLatLng(newLatLng);
-                    if (!tram.currentStationId) {
+            Object.keys(trams).forEach(tramId => {
+                let tram = trams[tramId];
+                let marker = tramMarkers[tramId];
+                if (marker) {
+                    let newLatLng = new L.LatLng(tram.lat, tram.lng);
+                    if (!marker.getLatLng().equals(newLatLng)) {  // Only update if position has changed
+                        marker.setLatLng(newLatLng);
                         let nearestStation = findNearestStation(tram);
                         if (nearestStation) {
-                            tram.currentStationId = nearestStation.id;
-                            console.log(`Updated initial current station for tram ${tramId}: ${tram.currentStationId}`);
-                        } else {
-                            console.error(`Initial station for tram ${tramId} not found`);
-                            return;
-                        }
-                    }
-                    let nextStation = stationsList.getNextStation(tram.currentStationId);
-                    if (nextStation) {
-                        let distanceToNextStation = calculateDistance(tram.lat, tram.lng, nextStation.latitude, nextStation.longitude);
-                        console.log(`Tram ${tramId} distance to next station ${nextStation.id}: ${distanceToNextStation}`);
-                        let currentDistance = calculateDistance(tram.lat, tram.lng, stationsList.findStationById(tram.currentStationId).station.latitude, stationsList.findStationById(tram.currentStationId).station.longitude);
-                        console.log(`Tram ${tramId} distance to current station ${tram.currentStationId}: ${currentDistance}`);
-                        if (distanceToNextStation < STATION_PROXIMITY_THRESHOLD) {
-                            tram.currentStationId = nextStation.id;
+                            if (!tram.currentStationId || tram.currentStationId !== nearestStation.id) {
+                                tram.currentStationId = nearestStation.id;
+                                console.log('Tram moved to a new station ID:', tram.currentStationId);
+                                marker.currentStationId = tram.currentStationId;
+                            }
                             generatePopupContent(tram, tramId).then(popupContent => {
-                                marker.bindPopup(popupContent).openPopup();
+                                marker.bindPopup(popupContent);
+                            }).catch(error => {
+                                console.error('Failed to generate popup content:', error);
                             });
-                            console.log(`Tram ${tramId} passed station ${tram.currentStationId}`);
-                        } else if (distanceToNextStation > currentDistance && distanceToNextStation > STATION_PROXIMITY_THRESHOLD) {
-                            tram.currentStationId = nextStation.id;
-                            console.log(`Tram ${tramId} updated to next station ${tram.currentStationId} based on distance check`);
                         }
-                    } else {
-                        console.error(`Next station for tram ${tramId} not found`);
                     }
                 } else {
-                    console.log(`Tram ${tramId} is stationary at station ${tram.currentStationId}`);
+                    console.error('Marker not found for tram:', tramId);
                 }
-            }
-        })
-        .catch(error => console.error('Error updating tram positions:', error));
+            });
+        });
 }
 
 setInterval(() => {
-    Object.keys(tramMarkers).forEach(tramId => {
-        fetch(`http://localhost:3000/api/tramPositions`)
-            .then(response => response.json())
-            .then(trams => updateTramMarker(tramId, trams[tramId]))
-            .catch(error => console.error('Error fetching tram positions:', error));
-    });
+    Object.keys(tramMarkers).forEach(updateTramMarker);
 }, 3000);
 
-// Function to find the nearest station by distance
 function findNearestStation(tram) {
-    let minDistance = Infinity;
-    let nearestStation = null;
-    let currentNode = stationsList.head;
-    if (!currentNode) return null;
+    if (!tram.currentStationId) {
+        // If currentStationId is not set, find the nearest station by distance
+        let minDistance = Infinity;
+        let nearestStation = null;
+        stations.forEach(station => {
+            let distance = calculateDistance(tram.lat, tram.lng, station.latitude, station.longitude);
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestStation = station;
+            }
+        });
+        console.log('Nearest Station by Distance:', nearestStation);
+        return nearestStation;
+    } else {
+        // If currentStationId is set, find the next station by ID and direction
+        let currentStationIndex = stations.findIndex(station => station.id === tram.currentStationId);
+        if (currentStationIndex === -1) return null; // If current station not found, return null
 
-    do {
-        let station = currentNode.station;
-        let distance = calculateDistance(tram.lat, tram.lng, station.latitude, station.longitude);
-        console.log(`Distance from tram to station ${station.id} (${station.name}): ${distance}`);
-        if (distance < minDistance) {
-            minDistance = distance;
-            nearestStation = station;
+        let nextStationIndex = (currentStationIndex + tram.direction) % stations.length;
+        if (nextStationIndex < 0) nextStationIndex += stations.length; // Handle negative index
+
+        // Ensure the station direction is correct
+        let nextStation = stations[nextStationIndex];
+        while (nextStation && nextStation.name === stations[currentStationIndex].name && nextStation.id !== stations[currentStationIndex].id) {
+            nextStationIndex = (nextStationIndex + tram.direction) % stations.length;
+            if (nextStationIndex < 0) nextStationIndex += stations.length; // Handle negative index
+            nextStation = stations[nextStationIndex];
         }
-        currentNode = currentNode.next;
-    } while (currentNode !== stationsList.head);
 
-    return nearestStation;
-}
-
-// Function to generate popup content for trams
-async function generatePopupContent(tram, tram_id) {
-    if (!tram || !tram.currentStationId) {
-        return '<b>Tram Route Information:</b><br>No additional information available.';
+        return nextStation;
     }
-
-    let popupContent = `<b>Tram Route Information:<br>Tram ID: ${tram_id}</b><br>`;
-    let currentStationId = tram.currentStationId;
-    for (let i = 0; i < 5; i++) {
-        let nextStation = stationsList.getNextStation(currentStationId);
-        if (nextStation) {
-            let distance = calculateDistance(tram.lat, tram.lng, nextStation.latitude, nextStation.longitude);
-            let time = approximateTravelTime(distance, tram.speed);
-            popupContent += `${i + 1}. Next station: ${nextStation.name}<br>Approx. travel time: ${time} mins<br>`;
-            currentStationId = nextStation.id;
-        }
-    }
-
-    return popupContent;
 }
 
 // Function to calculate distance using the Haversine formula
@@ -228,7 +157,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     var lat1Rad = lat1 * Math.PI / 180;
     var lat2Rad = lat2 * Math.PI / 180;
     var deltaLat = (lat2 - lat1) * Math.PI / 180;
-    var deltaLon = (lon1 - lon2) * Math.PI / 180;
+    var deltaLon = (lon2 - lon1) * Math.PI / 180;
 
     var a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
             Math.cos(lat1Rad) * Math.cos(lat2Rad) *
@@ -240,37 +169,35 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 // Function to approximate travel time based on distance and speed
 function approximateTravelTime(distance, speed) {
-    if (speed <= 0) return Infinity;
+    if (speed <= 0) return Infinity; // Avoid division by zero or negative speed
     const timeInSeconds = distance / speed;
-    return Math.round(timeInSeconds / 60);
+    return Math.round(timeInSeconds / 60); // Convert to minutes
 }
 
-// WebSocket connection for real-time updates and notifications
-document.addEventListener('DOMContentLoaded', function () {
-    const ws = new WebSocket('ws://localhost:3000');
-
-    ws.onopen = function () {
-        console.log('WebSocket connection established.');
-    };
-
-    ws.onmessage = function (event) {
-        const message = JSON.parse(event.data);
-        console.log('Received message:', message);
-        if (message.type === 'notification') {
-            new Notification(`Tram ${message.tramId} Alert`, {
-                body: message.message,
-            });
+function generatePopupContent(tram, tram_id) {
+    return new Promise((resolve, reject) => {
+        if (!tram || !tram.currentStationId || !Array.isArray(stations)) {
+            resolve('<b>Tram Route Information:</b><br>No additional information available.');
         }
-    };
 
-    ws.onerror = function (error) {
-        console.error('WebSocket error:', error);
-    };
-
-    ws.onclose = function () {
-        console.log('WebSocket connection closed.');
-    };
-});
+        let popupContent = `<b>Tram Route Information:<br>Tram ID: ${tram_id}</b><br>`;
+        fetch(`http://localhost:3000/api/nextStations/${tram.currentStationId}`)
+            .then(response => response.json())
+            .then(nextStations => {
+                console.log('Next stations fetched:', nextStations); // Log the next stations data fetched
+                nextStations.forEach((station, index) => {
+                    let distance = calculateDistance(tram.lat, tram.lng, station.latitude, station.longitude);
+                    let time = approximateTravelTime(distance, tram.speed);
+                    popupContent += `${index + 1}. Next station: ${station.name}<br>Approx. travel time: ${time} mins<br>`;
+                });
+                resolve(popupContent);
+            })
+            .catch(error => {
+                console.error('Error fetching next stations:', error);
+                reject(error);
+            });
+    });
+}
 
 document.getElementById('search-input').addEventListener('input', function (e) {
     var searchText = e.target.value.toLowerCase();
@@ -284,24 +211,18 @@ document.getElementById('search-input').addEventListener('focus', function () {
 // Hide search results when clicking outside of them
 document.addEventListener('click', function(event) {
     var isClickInside = document.getElementById('search-input').contains(event.target) || document.getElementById('search-results').contains(event.target);
-    if (!isClickInside) {
-        document.getElementById('search-results').innerHTML = '';
-    }
+if (!isClickInside) {
+     document.getElementById('search-results').innerHTML = '';
+}
 });
 
 function updateSearchResults(text) {
     var results = '';
-    let currentNode = stationsList.head;
-    if (!currentNode) return;
-
-    do {
-        let station = currentNode.station;
+    stations.forEach(station => {
         if (station.name.toLowerCase().includes(text)) {
             results += `<div class="search-result" data-station-id="${station.id}">${station.name}</div>`;
         }
-        currentNode = currentNode.next;
-    } while (currentNode !== stationsList.head);
-
+    });
     document.getElementById('search-results').innerHTML = results;
 
     // Add click listeners to each search result
@@ -315,11 +236,7 @@ function updateSearchResults(text) {
 
 function highlightMarker(stationId) {
     // Reset only station markers to default icon
-    let currentNode = stationsList.head;
-    if (!currentNode) return;
-
-    do {
-        let station = currentNode.station;
+    stations.forEach(station => {
         let marker = tramMarkers[station.id];
         if (marker) {
             marker.setIcon(L.icon({
@@ -327,16 +244,67 @@ function highlightMarker(stationId) {
                 iconSize: [25, 25]
             }));
         }
-        currentNode = currentNode.next;
-    } while (currentNode !== stationsList.head);
-
+    });
     // Highlight the selected station marker
     let marker = tramMarkers[stationId];
     if (marker) {
         marker.setIcon(L.icon({
-            iconUrl: 'assets/blackpin.png',
-            iconSize: [30, 30]
+            iconUrl: 'assets/blackpin.png', // Ensure you have a highlighted icon
+            iconSize: [30, 30] // Slightly larger
         }));
-        map.panTo(marker.getLatLng());
+        map.panTo(marker.getLatLng()); // Center the map on the selected marker
     }
 }
+
+// WebSocket connection for real-time updates
+document.addEventListener('DOMContentLoaded', function () {
+    function requestNotificationPermission() {
+        if (Notification.permission !== 'granted') {
+            Notification.requestPermission().then(permission => {
+                console.log('Notification permission status:', permission);
+                if (permission !== 'granted') {
+                    alert('Notifications are blocked. Please allow notifications in the browser settings.');
+                }
+            });
+        } else {
+            console.log('Notification permission status:', Notification.permission);
+        }
+    }
+
+    requestNotificationPermission();
+
+    const ws = new WebSocket('ws://localhost:3000');
+
+    ws.onopen = function () {
+        console.log('WebSocket connection established.');
+    };
+
+    ws.onmessage = function (event) {
+        const message = JSON.parse(event.data);
+        console.log('Received message:', message);
+        if (message.type === 'notification') {
+            new Notification(`Marked Tram ${message.tramId} Alert`, {
+                body: message.message,
+            });
+            if (message.highlight) {
+                highlightTramMarker(message.tramId);
+            }
+        }
+    };
+
+    ws.onerror = function (error) {
+        console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = function () {
+        console.log('WebSocket connection closed.');
+    };
+
+    // Function to highlight tram marker
+    function highlightTramMarker(tramId) {
+        const tramMarker = tramMarkers[tramId];
+        if (tramMarker) {
+            tramMarker.setIcon(highlightedIcon);
+        }
+    }
+});
