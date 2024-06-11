@@ -1,0 +1,112 @@
+/* General Styles for about-us.html */
+body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background-color: #f4f4f9;
+}
+
+header {
+    background-color: #e7fcf5;
+    color: black;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 10px 20px;
+}
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.logo-and-name {
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    height: 50px;
+    margin-right: 10px;
+}
+
+.site-name {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.about-us {
+    display: flex;
+    align-items: center;
+}
+
+.about-us a {
+    color: white;
+    text-decoration: none;
+    font-size: 16px;
+    padding: 10px 20px;
+    background-color: #1a252f;
+    border-radius: 4px;
+}
+
+.about-us a:hover {
+    background-color: #1a252f;
+}
+
+.content {
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2 {
+    color: #2c3e50;
+}
+
+p {
+    line-height: 1.6;
+    color: #333;
+}
+
+.social-icons {
+    display: flex;
+    gap: 10px;
+}
+
+.social-icons a {
+    color: #2c3e50;
+    font-size: 24px;
+    text-decoration: none;
+}
+
+.social-icons a:hover {
+    color: #007bff;
+}
+
+footer {
+    text-align: center;
+    padding: 10px;
+    background-color: #e7fcf5;
+    color: red;
+    border-radius: 0 0 8px 8px;
+}
+
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+    .header-container {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .logo-and-name,
+    .about-us {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 10px;
+    }
+}
