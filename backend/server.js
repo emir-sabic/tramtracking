@@ -13,7 +13,7 @@ app.use(express.json());
 
 const wss = new WebSocket.Server({ noServer: true });
 
-let tramLastPositions = {}; // Store the last known position and timestamp for each tram
+let tramLastPositions = {};
 
 app.get('/api/nextStations/:tramId', async (req, res) => {
     try {
@@ -29,7 +29,6 @@ app.get('/api/nextStations/:tramId', async (req, res) => {
         const stationQuery = await pool.query('SELECT * FROM stations ORDER BY id');
         const stations = stationQuery.rows;
 
-        // Find the current station ID based on tram's position (assume nearest station is the current station)
         let currentStationIndex = findCurrentStationIndex(tram, stations);
 
         if (currentStationIndex === -1) {
@@ -39,12 +38,10 @@ app.get('/api/nextStations/:tramId', async (req, res) => {
 
         console.log(`Current Station Index: ${currentStationIndex}, Current Station ID: ${stations[currentStationIndex].id}`);
 
-        // Get the next 5 stations based on the current station index
         let nextStations = getNextStationsById(currentStationIndex, stations);
 
         console.log(`Next 5 Stations:`, nextStations);
 
-        // Calculate approximate time to next stations
         let stationsWithApproxTime = nextStations.map(station => {
             const distance = getDistance(tram.latitude, tram.longitude, station.latitude, station.longitude);
             const approxTime = calculateApproxTime(distance, tram.speed || 10); // Default speed if not provided
@@ -85,14 +82,14 @@ function getNextStationsById(currentStationIndex, stations) {
 
 function calculateApproxTime(distance, speed) {
     if (speed === 0) return '∞ mins';
-    const timeInMinutes = (distance / speed) * 60; // time in minutes
+    const timeInMinutes = (distance / speed) * 60; 
     const minutes = Math.floor(timeInMinutes);
     const seconds = Math.round((timeInMinutes - minutes) * 60);
     return `${minutes} mins ${seconds} secs`;
 }
 
 function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of the earth in km
+    const R = 6371; 
     const dLat = deg2rad(lat2 - lat1);
     const dLon = deg2rad(lon2 - lon1);
     const a =
@@ -100,7 +97,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
         Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c; // Distance in km
+    const distance = R * c; 
     return distance;
 }
 
@@ -108,34 +105,30 @@ function deg2rad(deg) {
     return deg * (Math.PI / 180);
 }
 
-// Periodically check for stationary trams
-setInterval(checkStationaryTrams, 60000); // Check every minute
+setInterval(checkStationaryTrams, 60000); 
 
 async function checkStationaryTrams() {
     try {
         const { rows: tramPositions } = await pool.query('SELECT tram_id, latitude, longitude, timestamp FROM tram_positions');
 
         const currentTime = new Date();
-        const stationaryThreshold = 4 * 60 * 1000; // 4 minutes in milliseconds
+        const stationaryThreshold = 4 * 60 * 1000; 
 
         tramPositions.forEach(tram => {
             const tramId = tram.tram_id;
             const currentPosition = { lat: tram.latitude, lng: tram.longitude };
 
             if (!tramLastPositions[tramId]) {
-                // Initialize last known position and timestamp
                 tramLastPositions[tramId] = { position: currentPosition, timestamp: new Date(tram.timestamp).getTime() };
             } else {
                 const lastPosition = tramLastPositions[tramId].position;
                 const lastTimestamp = tramLastPositions[tramId].timestamp;
 
                 if (lastPosition.lat === currentPosition.lat && lastPosition.lng === currentPosition.lng) {
-                    // Check if the tram has been stationary for too long
                     if ((currentTime.getTime() - lastTimestamp) > stationaryThreshold) {
                         sendNotification(tramId);
                     }
                 } else {
-                    // Update the last known position and timestamp
                     tramLastPositions[tramId] = { position: currentPosition, timestamp: currentTime.getTime() };
                 }
             }
@@ -243,30 +236,26 @@ app.get('/api/tramPositions', async (req, res) => {
 
 
 
-// Add bug report endpoint
 app.post('/report-bug', async (req, res) => {
     console.log('POST /report-bug endpoint hit');
     
     const { title, description } = req.body;
 
-    // Create a transporter object using SMTP transport
     let transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-            user: process.env.EMAIL_USER, // Use environment variable for email
-            pass: process.env.EMAIL_PASS  // Use environment variable for password
+            user: process.env.EMAIL_USER, 
+            pass: process.env.EMAIL_PASS  
         }
     });
 
-    // Setup email data
     let mailOptions = {
-        from: `"Bug Report" <${process.env.EMAIL_USER}>`, // Use environment variable for email
-        to: process.env.EMAIL_USER, // Send email to yourself for bug reports
+        from: `"Bug Report" <${process.env.EMAIL_USER}>`, 
+        to: process.env.EMAIL_USER, 
         subject: `Bug Report: ${title}`,
         text: `Title: ${title}\n\nDescription:\n${description}`
     };
 
-    // Send mail with defined transport object
     transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
             console.log('Error occurred while sending email:', error);

@@ -17,9 +17,8 @@ document.getElementById('bug-report-form').addEventListener('submit', function(e
         if (response.ok) {
             console.log('Bug report submitted successfully');
             alert('Bug report submitted successfully.');
-            titleInput.value = ''; // Clear the title input field
-            descriptionInput.value = ''; // Clear the description textarea
-
+            titleInput.value = '';
+            descriptionInput.value = '';
         } else {
             console.log('Failed to submit bug report');
             alert('Failed to submit bug report.');

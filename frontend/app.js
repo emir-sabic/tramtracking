@@ -1,12 +1,9 @@
-// Initialize the map and set its view to Sarajevo
 var map = L.map('mapid').setView([43.8563, 18.4131], 13);
 
-// Load and display tile layers on the map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 
-// Custom icons
 const tramIcon = L.icon({
     iconUrl: 'assets/tram-icon.png',
     iconSize: [25, 25],
@@ -35,13 +32,11 @@ const stationaryTramIcon = L.icon({
     popupAnchor: [0, -12]
 });
 
-// Initialize tram and station markers
 let tramMarkers = {};
 let stationMarkers = [];
 let highlightedMarker = null;
 let tramStationsData = {};
 
-// WebSocket connection for real-time updates
 function initWebSocket() {
     const ws = new WebSocket('ws://localhost:3000');
 
@@ -68,11 +63,11 @@ function initWebSocket() {
 
     ws.onclose = function() {
         console.log('WebSocket connection closed.');
-        // Reconnect after a delay
+
         setTimeout(initWebSocket, 1000);
     };
 
-    // Function to highlight tram marker
+    //highlight tram marker
     function highlightTramMarker(tramId) {
         const tramMarker = tramMarkers[tramId];
         if (tramMarker) {
@@ -82,7 +77,7 @@ function initWebSocket() {
 
 }
 
-// Function to highlight station
+//highlight station
 function highlightStation(marker, name) {
     if (highlightedMarker) {
         highlightedMarker.setIcon(stationIcon);
@@ -93,7 +88,7 @@ function highlightStation(marker, name) {
     marker.bindPopup(`Station: ${name}`);
 }
 
-// Function to handle search input
+//search input
 document.getElementById('search-input').addEventListener('input', function () {
     const query = this.value.toLowerCase();
     const results = stationMarkers.filter(item => item.name.toLowerCase().includes(query));
@@ -113,7 +108,7 @@ document.getElementById('search-input').addEventListener('input', function () {
     });
 });
 
-// Function to display all stations in the search results
+//display all stations in the search results
 function displayAllStations(stations) {
     const resultsContainer = document.getElementById('search-results');
     resultsContainer.innerHTML = '';
@@ -131,7 +126,7 @@ function displayAllStations(stations) {
     });
 }
 
-// Function to load tram data and update markers
+//load tram data and update markers
 async function loadTramData() {
     try {
         const response = await fetch('http://localhost:3000/api/tramPositions');
@@ -140,7 +135,7 @@ async function loadTramData() {
         // Update tram markers
         for (let tramId in data) {
             const tram = data[tramId];
-            const newLatLng = L.latLng(tram.lat, tram.lng); // Convert to Leaflet LatLng object
+            const newLatLng = L.latLng(tram.lat, tram.lng); 
 
             if (tramMarkers[tramId]) {
                 const marker = tramMarkers[tramId];
@@ -158,7 +153,7 @@ async function loadTramData() {
                     });
                 tramMarkers[tramId] = marker;
 
-                // Initialize next 5 stations
+                //next 5 stations
                 await showTramInfo(tramId);
             }
         }
@@ -167,7 +162,7 @@ async function loadTramData() {
     }
 }
 
-// Function to load station data and create markers
+//load station data and create markers
 async function loadStationData() {
     try {
         const response = await fetch('http://localhost:3000/api/stations');
@@ -180,7 +175,7 @@ async function loadStationData() {
             stationMarkers.push({ marker: marker, name: station.name, id: station.id });
         });
 
-        // Populate search results when search bar is clicked
+        //search results when search bar is clicked
         const searchInput = document.getElementById('search-input');
         if (searchInput) {
             searchInput.addEventListener('focus', () => displayAllStations(data));
@@ -190,7 +185,7 @@ async function loadStationData() {
     }
 }
 
-// Function to show tram info on marker click
+//show tram info on marker click
 async function showTramInfo(tramId) {
     try {
         console.log(`Fetching next stations for tram: ${tramId}`);
@@ -207,7 +202,7 @@ async function showTramInfo(tramId) {
     }
 }
 
-// Function to update tram popup with next 5 stations and approximate times
+//update tram popup with next 5 stations and approximate times
 function updateTramPopup(tramId) {
     const tram = tramMarkers[tramId].getLatLng();
     const stations = tramStationsData[tramId];
@@ -215,14 +210,14 @@ function updateTramPopup(tramId) {
     let info = `<strong>Tram: ${tramId}</strong><br><br><strong>Next 5 Stations:</strong><br>`;
     stations.forEach(station => {
         const distance = map.distance(tram, L.latLng(station.latitude, station.longitude)) / 1000; // in km
-        const time = calculateApproxTime(distance, station.speed || 10); // Default speed if not provided
+        const time = calculateApproxTime(distance, station.speed || 10); //speed if not provided
         info += `${station.name} (approx. ${time})<br>`;
     });
 
     tramMarkers[tramId].bindPopup(info);
 }
 
-// Function to calculate approximate time in minutes and seconds
+//calculate approximate time in minutes and seconds
 function calculateApproxTime(distance, speed) {
     if (isNaN(distance) || isNaN(speed) || speed <= 0) return '0 mins';
     const timeInMinutes = (distance / speed) * 60; // time in minutes
@@ -231,7 +226,7 @@ function calculateApproxTime(distance, speed) {
     return `${minutes} mins ${seconds} secs`;
 }
 
-// Function to update next 5 stations based on tram position
+//update next 5 stations based on tram position
 function updateNextStations(tramId, oldLatLng, newLatLng) {
     const stations = tramStationsData[tramId];
     if (stations && stations.length > 0) {
@@ -250,7 +245,7 @@ function updateNextStations(tramId, oldLatLng, newLatLng) {
     }
 }
 
-// Hide search results when clicking outside of them
+//hide search results when clicking outside of them
 document.addEventListener('click', function (event) {
     const searchInput = document.getElementById('search-input');
     const searchResults = document.getElementById('search-results');
@@ -262,7 +257,6 @@ document.addEventListener('click', function (event) {
     }
 });
 
-// Initialize WebSocket connection and request notification permission
 document.addEventListener('DOMContentLoaded', function () {
     function requestNotificationPermission() {
         if (Notification.permission !== 'granted') {
@@ -281,5 +275,5 @@ document.addEventListener('DOMContentLoaded', function () {
     initWebSocket();
     loadStationData();
     loadTramData();
-    setInterval(loadTramData, 3000); // Update tram positions every 3 seconds
+    setInterval(loadTramData, 3000); 
 });
