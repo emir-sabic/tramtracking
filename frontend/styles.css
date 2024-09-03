@@ -1,4 +1,4 @@
-/* General Styles */
+
 body {
     margin: 0;
     font-family: 'Roboto', sans-serif;
@@ -14,7 +14,7 @@ header {
 
 .header-container {
     display: flex;
-    justify-content: space-between; /* Space items evenly */
+    justify-content: space-between; 
     align-items: center;
     max-width: 1200px;
     margin: 0 auto;
@@ -40,7 +40,7 @@ header {
     position: relative;
     flex: 1;
     display: flex;
-    justify-content: center; /* Center the search bar */
+    justify-content: center; 
     max-width: 400px;
 }
 
@@ -97,16 +97,16 @@ header {
 }
 
 #mapid {
-    height: calc(100vh - 70px); /* Adjust height based on header height */
+    height: calc(100vh - 70px); 
     width: 100%;
 }
 
-/* Mobile Styles */
+
 @media (max-width: 768px) {
     .header-container {
         flex-direction: column;
         align-items: center;
-        text-align: center; /* Center text */
+        text-align: center; 
     }
 
     .logo-and-name,
@@ -123,6 +123,6 @@ header {
     }
 
     #mapid {
-        height: calc(100vh - 175px); /* Adjust height based on header height */
+        height: calc(100vh - 175px); 
     }
 }

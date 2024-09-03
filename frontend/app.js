@@ -46,7 +46,6 @@ function initWebSocket() {
 
     ws.onmessage = function(event) {
         const message = JSON.parse(event.data);
-        console.log('Received message:', message);
         if (message.type === 'notification') {
             new Notification(`Marked Tram ${message.tramId} Alert`, {
                 body: message.message,
@@ -148,7 +147,6 @@ async function loadTramData() {
             } else {
                 const marker = L.marker([tram.lat, tram.lng], { icon: tramIcon }).addTo(map)
                     .on('click', () => {
-                        console.log(`Tram marker clicked: ${tramId}`);
                         showTramInfo(tramId);
                     });
                 tramMarkers[tramId] = marker;
@@ -188,11 +186,8 @@ async function loadStationData() {
 //show tram info on marker click
 async function showTramInfo(tramId) {
     try {
-        console.log(`Fetching next stations for tram: ${tramId}`);
         const response = await fetch(`http://localhost:3000/api/nextStations/${tramId}`);
         const data = await response.json();
-
-        console.log('Next stations data:', data);
 
         tramStationsData[tramId] = data;
 

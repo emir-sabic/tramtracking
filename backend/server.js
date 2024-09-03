@@ -36,11 +36,7 @@ app.get('/api/nextStations/:tramId', async (req, res) => {
             return res.status(404).send('No current station found');
         }
 
-        console.log(`Current Station Index: ${currentStationIndex}, Current Station ID: ${stations[currentStationIndex].id}`);
-
         let nextStations = getNextStationsById(currentStationIndex, stations);
-
-        console.log(`Next 5 Stations:`, nextStations);
 
         let stationsWithApproxTime = nextStations.map(station => {
             const distance = getDistance(tram.latitude, tram.longitude, station.latitude, station.longitude);
@@ -80,13 +76,6 @@ function getNextStationsById(currentStationIndex, stations) {
     return nextStations;
 }
 
-function calculateApproxTime(distance, speed) {
-    if (speed === 0) return '∞ mins';
-    const timeInMinutes = (distance / speed) * 60; 
-    const minutes = Math.floor(timeInMinutes);
-    const seconds = Math.round((timeInMinutes - minutes) * 60);
-    return `${minutes} mins ${seconds} secs`;
-}
 
 function getDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; 
@@ -112,7 +101,7 @@ async function checkStationaryTrams() {
         const { rows: tramPositions } = await pool.query('SELECT tram_id, latitude, longitude, timestamp FROM tram_positions');
 
         const currentTime = new Date();
-        const stationaryThreshold = 4 * 60 * 1000; 
+        const stationaryThreshold = 4 * 60 * 1000; //4 minutes
 
         tramPositions.forEach(tram => {
             const tramId = tram.tram_id;
@@ -267,7 +256,7 @@ app.post('/report-bug', async (req, res) => {
 });
 
 
-
+function calculateApproxTime(distance, speed) {}
 const server = app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
